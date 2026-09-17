@@ -1,64 +1,64 @@
 # nextjs-playground
 
-Учебное приложение на Next.js App Router, React и JavaScript: одна страница с интерактивным счётчиком и адаптивными стилями.
+A learning project built with Next.js App Router, React, and JavaScript: a single page with an interactive counter and responsive styles.
 
-## Требования
+## Requirements
 
-Node.js 22+ и npm.
+Node.js 22+ and npm.
 
-## Локальный запуск
+## Local development
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Откройте http://localhost:3000. Счётчик работает в браузере и сбрасывается при перезагрузке.
+Open http://localhost:3000. The counter runs in your browser and resets when you reload the page.
 
-## Production-сборка
+## Production build
 
 ```sh
 npm run build
 ```
 
-В `next.config.mjs` установлен `output: 'export'`. Готовый сайт находится в `out/`: содержимое этого каталога можно разместить на статическом хостинге. Node.js нужен для разработки и сборки; опубликованная версия не содержит работающего Node.js-сервера, API или базы данных.
+`next.config.mjs` sets `output: 'export'`. The generated site is in `out/`: deploy the contents of this directory to a static host. Node.js is required for development and builds; the deployed version has no running Node.js server, API, or database.
 
-Для локальной проверки статической сборки, если установлен Python:
+To preview the static build locally, if Python is installed:
 
 ```sh
 python3 -m http.server 3000 --directory out
 ```
 
-## Структура
+## Project structure
 
-- `app/page.js` — страница и клиентский счётчик.
-- `app/layout.js` — общий layout и метаданные.
-- `app/globals.css` — адаптивные стили.
-- `app/icon.svg` — иконка приложения.
-- `next.config.mjs` — конфигурация статического экспорта.
+- `app/page.js` — page and client-side counter.
+- `app/layout.js` — shared layout and metadata.
+- `app/globals.css` — responsive styles.
+- `app/icon.svg` — application icon.
+- `next.config.mjs` — static export configuration.
 
-## Следующий шаг: серверный режим
+## Next step: server mode
 
-Для использования API и других серверных возможностей удалите `output: 'export'` из `next.config.mjs`, затем выполните `npm run build` и `npm start` на хостинге с поддержкой Node.js. В текущем режиме статического экспорта `npm start` не используется.
+To use APIs and other server features, remove `output: 'export'` from `next.config.mjs`, then run `npm run build` and `npm start` on a host that supports Node.js. `npm start` is not used in the current static export mode.
 
-## Автоматический деплой: GitHub Pages
+## Automatic deployment: GitHub Pages
 
-Workflow `.github/workflows/deploy-pages.yml` проверяет сборку в pull request и публикует `out/` после push/merge в `main`. Также доступен ручной запуск: **Actions → Build and deploy to GitHub Pages → Run workflow** (ветка `main`). Из PR и других веток публикация не выполняется.
+The `.github/workflows/deploy-pages.yml` workflow checks builds in pull requests and publishes `out/` after a push or merge to `main`. You can also run it manually: **Actions → Build and deploy to GitHub Pages → Run workflow** (select `main`). Pull requests and other branches do not deploy.
 
-### Однократная настройка перед первым деплоем
+### One-time setup before the first deployment
 
-1. Откройте [Settings → Pages](https://github.com/yura888840/nextjs-playground/settings/pages).
-2. В разделе **Build and deployment → Source** выберите **GitHub Actions**.
-3. Слейте PR с workflow в `main`. Если PR уже слит, запустите workflow вручную.
-4. Дождитесь успешного задания `deploy` во вкладке Actions.
+1. Open [Settings → Pages](https://github.com/yura888840/nextjs-playground/settings/pages).
+2. Under **Build and deployment → Source**, select **GitHub Actions**.
+3. Merge the workflow PR into `main`. If it is already merged, run the workflow manually.
+4. Wait for the `deploy` job to succeed in the Actions tab.
 
-После успешной публикации сайт будет доступен по адресу:
+After a successful deployment, the site will be available at:
 https://yura888840.github.io/nextjs-playground/
 
-GitHub Pages бесплатен для этого публичного репозитория. Отдельный аккаунт хостинга и пользовательские секреты не нужны: используются встроенные `GITHUB_TOKEN` и OIDC. Сайт будет публичным.
+GitHub Pages is free for this public repository. No separate hosting account or user-managed secrets are needed: the workflow uses the built-in `GITHUB_TOKEN` and OIDC. The site will be public.
 
-Workflow задаёт `NEXT_PUBLIC_BASE_PATH=/nextjs-playground`, чтобы JavaScript, CSS и ссылки корректно работали в подпапке GitHub Pages. Локальный `npm run dev` по-прежнему открывается в корне `http://localhost:3000`. При переименовании репозитория обновите путь в workflow; для собственного домена в корне уберите эту переменную.
+The workflow sets `NEXT_PUBLIC_BASE_PATH=/nextjs-playground` so JavaScript, CSS, and links work correctly under the GitHub Pages subpath. Local `npm run dev` still serves the app at the root of `http://localhost:3000`. If you rename the repository, update the path in the workflow; for a custom domain serving the app at its root, remove this variable.
 
-GitHub Pages раздаёт только статические файлы и не запускает Node.js, SSR или серверные API. При переходе на серверный режим потребуется другой хостинг и другой workflow.
+GitHub Pages serves static files only and does not run Node.js, SSR, or server APIs. Switching to server mode requires a different host and workflow.
 
-Документация: [GitHub Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages), [Next.js basePath](https://nextjs.org/docs/app/api-reference/config/next-config-js/basePath).
+Documentation: [GitHub Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages), [Next.js basePath](https://nextjs.org/docs/app/api-reference/config/next-config-js/basePath).
