@@ -1,0 +1,71 @@
+name: Build and deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_BASE_PATH: /nextjs-playground
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static export
+        run: npm run build
+
+      - name: Check exported entrypoints
+        run: |
+          test -s out/index.html
+          test -s out/404.html
+          test -d out/_next/static
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: out
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
