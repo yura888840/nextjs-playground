@@ -1,5 +1,5 @@
 import { createTask, listTasks } from '../../../lib/task-store.js';
-import { json, readTaskInput } from '../../../lib/task-http.js';
+import { json, readTaskInput, methodNotAllowed } from '../../../lib/task-http.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,3 +14,7 @@ export async function POST(request) {
   const task = createTask(input.data);
   return json(task, 201, { Location: `/api/tasks/${task.id}` });
 }
+
+export const PUT = () => methodNotAllowed('GET, HEAD, POST, OPTIONS');
+export const PATCH = PUT;
+export const DELETE = PUT;

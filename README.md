@@ -55,7 +55,7 @@ This step focuses on HTTP methods, request bodies, dynamic route parameters, and
 
 A task has `id` (server-generated UUID), `title`, `status`, `createdAt`, and `updatedAt` (UTC timestamps). Status is `todo` by default, with `in_progress` and `done` also supported. List order is insertion order; filtering and pagination are separate exercises.
 
-POST requires a title; status is optional. PATCH accepts title, status, or both, and preserves omitted fields. Titles are trimmed and must contain 1–200 characters. Empty patches, unknown fields, invalid statuses, malformed JSON, and non-object bodies return 400. Missing tasks return 404; unsupported methods return 405. Application errors use `{ "error": "..." }`. Server-owned IDs and timestamps cannot be overwritten. API responses use `Cache-Control: no-store`.
+POST requires a title; status is optional. PATCH accepts title, status, or both, and preserves omitted fields. Titles are trimmed and must contain 1–200 characters. Empty patches, unknown fields, invalid statuses, and non-object bodies return 422. Malformed JSON and malformed UUIDs return 400, non-JSON content types return 415, missing tasks return 404, and unsupported methods return 405. Errors use the structured format documented below. Server-owned IDs and timestamps cannot be overwritten. API responses use `Cache-Control: no-store`.
 
 ### Try it
 
@@ -78,7 +78,37 @@ curl -X PATCH http://localhost:3000/api/tasks/TASK_ID \
 curl -i -X DELETE http://localhost:3000/api/tasks/TASK_ID
 ```
 
-Open http://localhost:3000/tasks or follow **Open task manager** from the homepage. The task manager loads tasks from the API and supports creation, editing titles and statuses, and deletion with confirmation. Refresh reloads the server list. Loading and error messages are shown, and controls are disabled during requests to prevent duplicate submissions. Tasks are only updated in the UI after a successful server response; no localStorage persistence is used. The same temporary-storage limitations apply. You can also use curl or an API client. Basic input checks keep CRUD behavior predictable; Zod schemas and richer validation are planned for task 3.
+Open http://localhost:3000/tasks or follow **Open task manager** from the homepage. The task manager loads tasks from the API and supports creation, editing titles and statuses, and deletion with confirmation. Refresh reloads the server list. Loading and error messages are shown, and controls are disabled during requests to prevent duplicate submissions. Tasks are only updated in the UI after a successful server response; no localStorage persistence is used. The same temporary-storage limitations apply. You can also use curl or an API client. Shared Zod schemas validate form submissions locally and API requests independently on the server.
+
+## Third backend task: validation
+
+`lib/task-schema.js` is shared by the browser and server. POST requires a trimmed title (1–200 UTF-16 code units) and defaults status to `todo`. PATCH accepts title and/or status without applying defaults to omitted fields. Unknown properties and server-owned fields are rejected. Route IDs must be UUIDs. Client checks improve feedback; the server always validates independently.
+
+Handled task API errors follow this contract:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Please correct the highlighted fields.",
+    "fieldErrors": { "title": ["Enter a task title."] },
+    "formErrors": []
+  }
+}
+```
+
+| Status | Code | Meaning |
+| --- | --- | --- |
+| 400 | `INVALID_JSON` | Missing or malformed JSON body |
+| 400 | `INVALID_ID` | Malformed task UUID |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | POST/PATCH needs `application/json` (charset is allowed) |
+| 422 | `VALIDATION_ERROR` | Valid JSON that fails the schema |
+| 404 | `NOT_FOUND` | Well-formed UUID with no matching task |
+| 405 | `METHOD_NOT_ALLOWED` | Unsupported task route method; includes `Allow` |
+
+`fieldErrors` contains arrays of messages keyed by field; `formErrors` contains object-level errors such as empty PATCH or unknown keys. Invalid requests never partially modify a record. The frontend shows field errors under inputs with `aria-invalid`/`aria-describedby`, preserves drafts on rejection, and displays form errors separately. Text remains English.
+
+This changes the earlier string error response and 400 validation status. The included frontend and HTTP tests are updated together. Health responses remain unchanged. Framework-level errors outside task handlers may use Next.js's own response format.
 
 ## Verify the production server
 

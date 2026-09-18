@@ -31,3 +31,6 @@
 .actions span{font-size:14px}
 .edit{width:100%}
 @media(max-width:600px){.main{padding:24px 18px}.create{padding:18px}.create>.field,.edit>.field{flex-basis:100%}.create>button{width:100%}.row{padding:16px}.heading h1{font-size:40px}}
+
+.fieldError{color:#ffb4ac;font-size:14px;line-height:1.5;margin:0}
+.field [aria-invalid=true]{border-color:#ffb4ac}
