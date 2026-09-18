@@ -78,7 +78,7 @@ curl -X PATCH http://localhost:3000/api/tasks/TASK_ID \
 curl -i -X DELETE http://localhost:3000/api/tasks/TASK_ID
 ```
 
-The counter page is unchanged. Use curl or an API client for this backend exercise. Basic input checks keep CRUD behavior predictable; Zod schemas and richer validation are planned for task 3.
+Open http://localhost:3000/tasks or follow **Open task manager** from the homepage. The task manager loads tasks from the API and supports creation, editing titles and statuses, and deletion with confirmation. Refresh reloads the server list. Loading and error messages are shown, and controls are disabled during requests to prevent duplicate submissions. Tasks are only updated in the UI after a successful server response; no localStorage persistence is used. The same temporary-storage limitations apply. You can also use curl or an API client. Basic input checks keep CRUD behavior predictable; Zod schemas and richer validation are planned for task 3.
 
 ## Verify the production server
 
@@ -131,7 +131,9 @@ Automatic deployment stays disabled unless explicitly enabled. Manual deployment
 
 ## Files
 
-- `app/page.js`: interactive counter page.
+- `app/page.js`: counter page with a link to the task manager.
+- `app/tasks/page.js`: client-side CRUD interface.
+- `app/tasks/tasks.module.css`: responsive task manager styles.
 - `app/layout.js`: English metadata and document language.
 - `app/api/health/route.js`: server endpoint.
 - `app/api/tasks/route.js`: task collection handlers.
