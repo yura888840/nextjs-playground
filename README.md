@@ -1,64 +1,93 @@
 # nextjs-playground
 
-A learning project built with Next.js App Router, React, and JavaScript: a single page with an interactive counter and responsive styles.
+A Next.js App Router learning project with a React counter and a Node.js health endpoint. All application copy is in English.
 
-## Requirements
+## Run locally
 
-Node.js 22+ and npm.
-
-## Local development
+Requires Node.js 22+ and npm.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. The counter runs in your browser and resets when you reload the page.
-
-## Production build
+Open http://localhost:3000. For production mode:
 
 ```sh
 npm run build
+npm start
 ```
 
-`next.config.mjs` sets `output: 'export'`. The generated site is in `out/`: deploy the contents of this directory to a static host. Node.js is required for development and builds; the deployed version has no running Node.js server, API, or database.
-
-To preview the static build locally, if Python is installed:
+## First backend task: GET /api/health
 
 ```sh
-python3 -m http.server 3000 --directory out
+curl -i http://localhost:3000/api/health
 ```
 
-## Project structure
+Example response (the timestamp changes on every request):
 
-- `app/page.js` — page and client-side counter.
-- `app/layout.js` — shared layout and metadata.
-- `app/globals.css` — responsive styles.
-- `app/icon.svg` — application icon.
-- `next.config.mjs` — static export configuration.
+```json
+{"status":"ok","timestamp":"2026-09-18T12:00:00.000Z"}
+```
 
-## Next step: server mode
+- `app/api/health/route.js` maps the `GET` export to HTTP GET.
+- It returns HTTP 200, JSON, and the current server time in UTC.
+- `runtime = 'nodejs'` selects the Node.js runtime.
+- `dynamic = 'force-dynamic'` and `Cache-Control: no-store` prevent a build-time or cached health response.
+- Unsupported methods such as POST return 405. Next.js also supplies HEAD/OPTIONS handling.
+- This is a liveness check only: it does not verify a database or external services.
 
-To use APIs and other server features, remove `output: 'export'` from `next.config.mjs`, then run `npm run build` and `npm start` on a host that supports Node.js. `npm start` is not used in the current static export mode.
+The page counter remains browser-local and resets on reload.
 
-## Automatic deployment: GitHub Pages
+## Verify the production server
 
-The `.github/workflows/deploy-pages.yml` workflow checks builds in pull requests and publishes `out/` after a push or merge to `main`. You can also run it manually: **Actions → Build and deploy to GitHub Pages → Run workflow** (select `main`). Pull requests and other branches do not deploy.
+```sh
+npm run build
+npm run test:health
+```
 
-### One-time setup before the first deployment
+The check starts and stops its own production server on an OS-assigned local port. It verifies the homepage, HTTP status, JSON, response cache policy, fresh server timestamps, and rejection of POST requests.
 
-1. Open [Settings → Pages](https://github.com/yura888840/nextjs-playground/settings/pages).
-2. Under **Build and deployment → Source**, select **GitHub Actions**.
-3. Merge the workflow PR into `main`. If it is already merged, run the workflow manually.
-4. Wait for the `deploy` job to succeed in the Actions tab.
+## GitHub Actions
 
-After a successful deployment, the site will be available at:
-https://yura888840.github.io/nextjs-playground/
+`.github/workflows/server.yml` builds and tests pull requests and pushes to `main`. Deployment runs only on `main`, after successful checks, when the repository variable `VERCEL_DEPLOY_ENABLED` equals `true`. Manual runs are also available on `main`.
 
-GitHub Pages is free for this public repository. No separate hosting account or user-managed secrets are needed: the workflow uses the built-in `GITHUB_TOKEN` and OIDC. The site will be public.
+PR checks require no secrets. The deployment job uses Vercel's production build configuration and deploys the resulting prebuilt artifact. `vercel.json` disables native Git-triggered Vercel deployments to avoid bypassing the Actions checks.
 
-The workflow sets `NEXT_PUBLIC_BASE_PATH=/nextjs-playground` so JavaScript, CSS, and links work correctly under the GitHub Pages subpath. Local `npm run dev` still serves the app at the root of `http://localhost:3000`. If you rename the repository, update the path in the workflow; for a custom domain serving the app at its root, remove this variable.
+## One-time Vercel setup
 
-GitHub Pages serves static files only and does not run Node.js, SSR, or server APIs. Switching to server mode requires a different host and workflow.
+Vercel Hobby is free within its limits for personal, non-commercial projects. API handlers run as Vercel Functions, not as a permanently running VPS process.
 
-Documentation: [GitHub Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages), [Next.js basePath](https://nextjs.org/docs/app/api-reference/config/next-config-js/basePath).
+1. Create a Vercel Hobby account and a project for this repository. Use the Next.js preset, repository root, Node.js 22.x, and the default Next.js output directory (not `out`).
+2. Link the local checkout to that project:
+
+   ```sh
+   npx vercel@59.23.1 login
+   npx vercel@59.23.1 link
+   ```
+
+3. Create a Vercel access token. In GitHub **Settings → Secrets and variables → Actions**, add repository secrets:
+   - `VERCEL_TOKEN`: your Vercel access token.
+   - `VERCEL_ORG_ID`: `orgId` from the generated `.vercel/project.json`.
+   - `VERCEL_PROJECT_ID`: `projectId` from that file.
+4. Add the repository **variable** `VERCEL_DEPLOY_ENABLED` with value `true`.
+5. Merge this PR and inspect the Actions run, or run **Build, test, and deploy Next.js** manually on `main` if already merged.
+6. Open the production domain shown by Vercel and check `/api/health` twice to confirm fresh timestamps. Live hosting is not verified by the local test.
+
+Keep tokens in GitHub Secrets; do not commit them. `.vercel/` is ignored. No secrets are needed to run the application locally.
+
+## Migration from GitHub Pages
+
+The Pages workflow and static export configuration have been replaced because GitHub Pages cannot execute this API. The app now serves from `/`, without `/nextjs-playground`. Existing Pages content may remain online as an old snapshot, but receives no new deployments. Once Vercel is verified, unpublish the old Pages site in repository settings if desired.
+
+The deployment job stays disabled until setup is complete, so builds and API checks can run immediately. This PR alone does not create a Vercel account or publish a live server.
+
+## Files
+
+- `app/page.js`: interactive counter page.
+- `app/layout.js`: English metadata and document language.
+- `app/api/health/route.js`: server endpoint.
+- `scripts/check-health.mjs`: production HTTP check.
+- `.github/workflows/server.yml`: CI and optional production deployment.
+
+References: [Next.js Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), [Vercel with GitHub Actions](https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel), [Vercel Hobby](https://vercel.com/docs/plans/hobby).
