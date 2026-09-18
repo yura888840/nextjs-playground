@@ -51,7 +51,7 @@ try {
   assert.equal((await request(`${origin}/api/health`, { method: 'POST' })).status, 405);
   console.log('Passed: homepage, health JSON, fresh timestamps, no-store, POST rejection.');
   if (process.argv.includes('--storage-unavailable')) {
-    const response = await request(`${origin}/api/tasks`);
+    const response = await request(`${origin}/api/auth/me`, { headers: { Cookie: `__Host-session=${'0'.repeat(64)}` } });
     assert.equal(response.status, 503);
     const failure = await response.json();
     assert.equal(failure.error.code, 'DATABASE_UNAVAILABLE');
@@ -59,13 +59,19 @@ try {
     assert.deepEqual(failure.error.formErrors, []);
     console.log('Passed: unconfigured storage returns a structured 503.');
   }
+  if (process.argv.includes('--permissions')) {
+    const { checkPermissions } = await import('./check-permissions.mjs');
+    await checkPermissions(origin);
+  }
   if (process.argv.includes('--auth')) {
     const { checkAuth } = await import('./check-auth.mjs');
     await checkAuth(origin);
   }
   if (process.argv.includes('--tasks')) {
     const { checkTasks } = await import('./check-tasks.mjs');
-    await checkTasks(origin);
+    const { createTestAccount } = await import('./test-account.mjs');
+    const account = await createTestAccount(origin);
+    try { await checkTasks(origin, account.cookie); } finally { await account.cleanup(); }
   }
 } finally {
   if (server.exitCode === null) {

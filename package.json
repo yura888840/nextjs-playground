@@ -11,7 +11,9 @@
     "db:migrate": "node scripts/migrate.mjs",
     "test:db": "node scripts/check-persistence.mjs",
     "test:storage-unavailable": "node scripts/check-health.mjs --storage-unavailable",
-    "test:auth": "node scripts/check-health.mjs --auth"
+    "test:auth": "node scripts/check-health.mjs --auth",
+    "test:permissions": "node scripts/check-health.mjs --permissions",
+    "user:role": "node scripts/set-role.mjs"
   },
   "keywords": [],
   "author": "",

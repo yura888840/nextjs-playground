@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 
-export async function checkTasks(origin) {
+export async function checkTasks(origin, cookie) {
   const request = (path = '', options = {}) => fetch(`${origin}/api/tasks${path}`, {
-    ...options, signal: AbortSignal.timeout(3000),
+    ...options, headers: { Cookie: cookie, Origin: origin, ...options.headers }, signal: AbortSignal.timeout(3000),
   });
   const write = (method, body) => ({
     method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

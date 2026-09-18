@@ -1,18 +1,18 @@
-import { taskHandler } from '../../../lib/task-handler.js';
+import { authenticated } from '../../../lib/permissions.js';
 import { createTask, listTasks } from '../../../lib/task-store.js';
 import { json, readTaskInput, methodNotAllowed } from '../../../lib/task-http.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export const GET = taskHandler(async () => {
-  return json({ tasks: await listTasks() });
+export const GET = authenticated(async (_request, _context, user) => {
+  return json({ tasks: await listTasks(user.id) });
 });
 
-export const POST = taskHandler(async (request) => {
+export const POST = authenticated(async (request, _context, user) => {
   const input = await readTaskInput(request);
   if (input.response) return input.response;
-  const task = await createTask(input.data);
+  const task = await createTask(input.data, user.id);
   return json(task, 201, { Location: `/api/tasks/${task.id}` });
 });
 
