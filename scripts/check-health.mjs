@@ -41,6 +41,10 @@ try {
   assert.ok(Date.parse(second.timestamp) > timestamp, 'Responses must not be cached');
   assert.equal((await request(`${origin}/api/health`, { method: 'POST' })).status, 405);
   console.log('Passed: homepage, health JSON, fresh timestamps, no-store, POST rejection.');
+  if (process.argv.includes('--tasks')) {
+    const { checkTasks } = await import('./check-tasks.mjs');
+    await checkTasks(origin);
+  }
 } finally {
   if (server.exitCode === null) {
     const exited = new Promise(resolve => server.once('exit', resolve));
