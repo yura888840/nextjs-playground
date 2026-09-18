@@ -10,7 +10,8 @@
     "test:api": "node scripts/check-health.mjs --tasks",
     "db:migrate": "node scripts/migrate.mjs",
     "test:db": "node scripts/check-persistence.mjs",
-    "test:storage-unavailable": "node scripts/check-health.mjs --storage-unavailable"
+    "test:storage-unavailable": "node scripts/check-health.mjs --storage-unavailable",
+    "test:auth": "node scripts/check-health.mjs --auth"
   },
   "keywords": [],
   "author": "",

@@ -131,6 +131,27 @@ SQL migrations live in `migrations/`. Run `npm run db:migrate` against each data
 
 The GitHub workflow provisions only an ephemeral test database. It does not create or migrate the hosted database. No hosted credentials are committed or required by PR checks.
 
+## Fifth backend task: accounts and sessions
+
+Open `/account` to register, sign in, view the current account, or sign out. Email addresses are normalized to lowercase. Passwords are 15–128 characters and are never trimmed. Zod validates both forms and server requests. Task ownership is introduced separately in task 6; at this step the task API remains a shared demo.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| POST | `/api/auth/register` | 201, new account and session |
+| POST | `/api/auth/login` | 200, new session; incorrect credentials return 401 |
+| POST | `/api/auth/logout` | 204, revoke current session and clear cookie |
+| GET | `/api/auth/me` | 200 with public user data, or 401 |
+
+Apply `002_auth.sql` with `npm run db:migrate` before deployment. Passwords use Node.js scrypt with a random salt (N=131072, r=8, p=1). Session tokens contain 32 random bytes; only their SHA-256 hashes are stored in PostgreSQL. Sessions expire after seven days and successful sign-in rotates the current browser session. Logout revokes the session in the database. Cookies use HttpOnly, SameSite=Lax, Path=/, and Secure with a `__Host-` prefix in production. Use HTTPS in deployment; `npm run dev` supports local HTTP.
+
+All auth POST requests require an exact matching `Origin` header, including requests from curl. Set `APP_ORIGIN` in Vercel to the public origin without a trailing slash, for example `https://your-project.vercel.app`. Without it, the request URL origin is used (local development and CI). Behind a proxy, configure the canonical public origin explicitly. No cross-origin CORS access is enabled.
+
+The shared database limits each normalized email to 10 authentication attempts per 15 minutes. Auth bodies are limited to 4 KiB. This educational limit is not a complete abuse prevention system: public deployment also needs edge/IP controls, and an attacker could temporarily exhaust another account's attempt budget. Email verification, password recovery and MFA are future tasks. Remove expired rows periodically with `DELETE FROM sessions WHERE expires_at < now()` and `DELETE FROM auth_attempts WHERE reset_at < now()`; expiry is enforced even before cleanup.
+
+Run `npm run test:auth` against the isolated test database after building. It checks hashing, duplicate accounts, invalid credentials, session rotation/revocation/expiry, cookie flags, rejected cross-origin requests, input limits and throttling. Tests create and remove only their own accounts.
+
+Implementation references: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
+
 ## Verify the production server
 
 Tests require a **separate, initially empty** database, with a name ending in `_test`. They use `TEST_DATABASE_URL`, never the development `DATABASE_URL`. Create the local test database once:

@@ -1,15 +1,20 @@
 import assert from 'node:assert/strict';
 import { testDatabaseUrl } from './test-database.mjs';
 
-if (process.argv.includes('--tasks')) process.env.DATABASE_URL = testDatabaseUrl();
+if (['--tasks', '--auth', '--permissions'].some(flag => process.argv.includes(flag))) process.env.DATABASE_URL = testDatabaseUrl();
 if (process.argv.includes('--storage-unavailable')) process.env.DATABASE_URL = '';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 
-// Start the production build on an OS-assigned port and test actual HTTP behavior.
-const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '0'], {
+// Reserve an available port so the canonical Origin is known before startup.
+const reservation = createServer();
+await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+const testPort = reservation.address().port;
+await new Promise(resolve => reservation.close(resolve));
+const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(testPort)], {
   stdio: ['ignore', 'pipe', 'pipe'],
-  env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' },
+  env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', APP_ORIGIN: `http://127.0.0.1:${testPort}` },
 });
 let logs = '';
 for (const stream of [server.stdout, server.stderr]) stream.on('data', chunk => { logs += chunk; });
@@ -53,6 +58,10 @@ try {
     assert.deepEqual(failure.error.fieldErrors, {});
     assert.deepEqual(failure.error.formErrors, []);
     console.log('Passed: unconfigured storage returns a structured 503.');
+  }
+  if (process.argv.includes('--auth')) {
+    const { checkAuth } = await import('./check-auth.mjs');
+    await checkAuth(origin);
   }
   if (process.argv.includes('--tasks')) {
     const { checkTasks } = await import('./check-tasks.mjs');
