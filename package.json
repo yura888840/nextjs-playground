@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "test:health": "node scripts/check-health.mjs"
+    "test:health": "node scripts/check-health.mjs",
+    "test:api": "node scripts/check-health.mjs --tasks"
   },
   "keywords": [],
   "author": "",

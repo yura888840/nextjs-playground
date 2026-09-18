@@ -1,6 +1,6 @@
 # nextjs-playground
 
-A Next.js App Router learning project with a React counter and a Node.js health endpoint. All application copy is in English.
+A Next.js App Router learning project with a React counter and Node.js health and task CRUD endpoints. All application copy is in English.
 
 ## Run locally
 
@@ -39,14 +39,55 @@ Example response (the timestamp changes on every request):
 
 The page counter remains browser-local and resets on reload.
 
+## Second backend task: tasks CRUD
+
+This step focuses on HTTP methods, request bodies, dynamic route parameters, and response status codes. Try it with a **single local Node.js server** (`npm run dev` or `npm start`).
+
+**Temporary storage:** tasks live in a process-local Map. Restarting or redeploying loses all tasks. Vercel functions, separate instances, and workers do not share this Map; a task created by one instance may be missing from another. This is an educational local API, not reliable hosted storage. Persistent storage is planned for task 4. The API currently has no authentication or user isolation; use disposable test data only.
+
+| Method | Endpoint | Success |
+| --- | --- | --- |
+| GET | `/api/tasks` | 200 with `{ "tasks": [...] }` |
+| POST | `/api/tasks` | 201 with the new task and a `Location` header |
+| GET | `/api/tasks/:id` | 200 with one task |
+| PATCH | `/api/tasks/:id` | 200 with the updated task |
+| DELETE | `/api/tasks/:id` | 204 with an empty body |
+
+A task has `id` (server-generated UUID), `title`, `status`, `createdAt`, and `updatedAt` (UTC timestamps). Status is `todo` by default, with `in_progress` and `done` also supported. List order is insertion order; filtering and pagination are separate exercises.
+
+POST requires a title; status is optional. PATCH accepts title, status, or both, and preserves omitted fields. Titles are trimmed and must contain 1–200 characters. Empty patches, unknown fields, invalid statuses, malformed JSON, and non-object bodies return 400. Missing tasks return 404; unsupported methods return 405. Application errors use `{ "error": "..." }`. Server-owned IDs and timestamps cannot be overwritten. API responses use `Cache-Control: no-store`.
+
+### Try it
+
+Create a task:
+
+```sh
+curl -i -X POST http://localhost:3000/api/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Learn Next.js CRUD"}'
+```
+
+Copy the returned `id` and replace `TASK_ID` below:
+
+```sh
+curl http://localhost:3000/api/tasks
+curl http://localhost:3000/api/tasks/TASK_ID
+curl -X PATCH http://localhost:3000/api/tasks/TASK_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"done"}'
+curl -i -X DELETE http://localhost:3000/api/tasks/TASK_ID
+```
+
+The counter page is unchanged. Use curl or an API client for this backend exercise. Basic input checks keep CRUD behavior predictable; Zod schemas and richer validation are planned for task 3.
+
 ## Verify the production server
 
 ```sh
 npm run build
-npm run test:health
+npm run test:api
 ```
 
-The check starts and stops its own production server on an OS-assigned local port. It verifies the homepage, HTTP status, JSON, response cache policy, fresh server timestamps, and rejection of POST requests.
+The check starts and stops its own production server on an OS-assigned local port. It verifies health behavior plus the complete task lifecycle across collection and detail routes, partial updates, invalid writes, missing records, and deletion isolation. `npm run test:health` remains available for the health-only check.
 
 ## GitHub Actions
 
@@ -93,7 +134,12 @@ Automatic deployment stays disabled unless explicitly enabled. Manual deployment
 - `app/page.js`: interactive counter page.
 - `app/layout.js`: English metadata and document language.
 - `app/api/health/route.js`: server endpoint.
-- `scripts/check-health.mjs`: production HTTP check.
+- `app/api/tasks/route.js`: task collection handlers.
+- `app/api/tasks/[id]/route.js`: individual task handlers.
+- `lib/task-store.js`: replaceable process-local task store.
+- `lib/task-http.js`: JSON responses and basic input checks.
+- `scripts/check-health.mjs`: production server runner and health checks.
+- `scripts/check-tasks.mjs`: task API HTTP checks.
 - `.github/workflows/server.yml`: CI and optional production deployment.
 
 References: [Next.js Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers), [Vercel with GitHub Actions](https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel), [Vercel Hobby](https://vercel.com/docs/plans/hobby).
