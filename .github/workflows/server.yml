@@ -57,6 +57,7 @@ jobs:
       - run: npm run test:api
       - run: npm run test:db
       - run: npm run test:auth
+      - run: npm run test:permissions
 
   deploy:
     needs: build-and-test

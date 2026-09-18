@@ -46,7 +46,7 @@ The page counter remains browser-local and resets on reload.
 
 This step focuses on HTTP methods, request bodies, dynamic route parameters, and response status codes.
 
-Tasks now persist in PostgreSQL (task 4) and are shared across application instances. The API has no authentication or user isolation yet: anyone with access can read and modify all tasks. Use test data only.
+Tasks now persist in PostgreSQL (task 4) and are shared across application instances. The task API requires a session and limits every operation to the current owner (task 6).
 
 | Method | Endpoint | Success |
 | --- | --- | --- |
@@ -133,7 +133,7 @@ The GitHub workflow provisions only an ephemeral test database. It does not crea
 
 ## Fifth backend task: accounts and sessions
 
-Open `/account` to register, sign in, view the current account, or sign out. Email addresses are normalized to lowercase. Passwords are 15–128 characters and are never trimmed. Zod validates both forms and server requests. Task ownership is introduced separately in task 6; at this step the task API remains a shared demo.
+Open `/account` to register, sign in, view the current account, or sign out. Email addresses are normalized to lowercase. Passwords are 15–128 characters and are never trimmed. Zod validates both forms and server requests. Task ownership and role checks are described in task 6 below.
 
 | Method | Endpoint | Result |
 | --- | --- | --- |
@@ -151,6 +151,36 @@ The shared database limits each normalized email to 10 authentication attempts p
 Run `npm run test:auth` against the isolated test database after building. It checks hashing, duplicate accounts, invalid credentials, session rotation/revocation/expiry, cookie flags, rejected cross-origin requests, input limits and throttling. Tests create and remove only their own accounts.
 
 Implementation references: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [OWASP session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
+
+## Sixth backend task: ownership and roles
+
+`/tasks` redirects anonymous visitors to `/account`. API requests are protected independently by `lib/permissions.js`; hiding UI controls is not the security boundary. Missing, expired or revoked sessions return 401. Task writes also require a matching Origin header.
+
+Task creation assigns the signed-in user's ID on the server. Every SELECT, UPDATE and DELETE includes an owner predicate in SQL. Submitted owner IDs and roles are rejected by the strict request schemas. Requests for someone else's UUID return the same 404 as a missing task. Owners cannot transfer tasks through PATCH. Admins also see only their own tasks.
+
+Migration `003_task_permissions.sql` preserves earlier demo rows with a NULL owner. These rows are invisible to all accounts through the API. They are not assigned to the first registered user. If you need to keep using a legacy task, deliberately assign it to a known account through trusted database administration. Deleting a user deletes that user's tasks and sessions.
+
+New users always have role `user`. `GET /api/admin/users` demonstrates an admin-only endpoint: it returns up to 100 account IDs, emails and roles, never passwords or sessions. Ordinary users receive 403. There is no public endpoint for granting roles. From a trusted terminal connected to the intended database:
+
+```sh
+npm run user:role -- someone@example.com admin
+npm run user:role -- someone@example.com user
+```
+
+Roles are loaded from PostgreSQL on every request, so changes affect existing sessions immediately. Apply migrations before deploying. Run `npm run test:permissions` to verify anonymous rejection, two-account isolation, forged ownership, cross-origin writes, legacy tasks, and role changes.
+
+### Authenticated curl requests
+
+The earlier CRUD examples now need a session cookie. Start with:
+
+```sh
+curl -c cookies.txt -X POST http://localhost:3000/api/auth/login \
+  -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"your long password here"}'
+curl -b cookies.txt http://localhost:3000/api/tasks
+```
+
+For POST/PATCH/DELETE add `-b cookies.txt` and `-H 'Origin: http://localhost:3000'` to the CRUD examples. Use `npm run dev` for HTTP testing; deployed production cookies require HTTPS. Keep cookie files private and out of version control.
 
 ## Verify the production server
 
@@ -216,7 +246,8 @@ Automatic deployment stays disabled unless explicitly enabled. Manual deployment
 ## Files
 
 - `app/page.js`: counter page with a link to the task manager.
-- `app/tasks/page.js`: client-side CRUD interface.
+- `app/tasks/page.js`: server-side session guard.
+- `app/tasks/task-manager.js`: client-side CRUD interface.
 - `app/tasks/tasks.module.css`: responsive task manager styles.
 - `app/layout.js`: English metadata and document language.
 - `app/api/health/route.js`: server endpoint.
