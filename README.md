@@ -50,7 +50,13 @@ The check starts and stops its own production server on an OS-assigned local por
 
 ## GitHub Actions
 
-`.github/workflows/server.yml` builds and tests pull requests and pushes to `main`. Deployment runs only on `main`, after successful checks, when the repository variable `VERCEL_DEPLOY_ENABLED` equals `true`. Manual runs are also available on `main`.
+`.github/workflows/server.yml` builds and tests pull requests, pushes to `main`, and manual runs. Production deployment always requires `main` and successful checks.
+
+- **Automatic:** pushes to `main` deploy only when the repository variable `VERCEL_DEPLOY_ENABLED` equals `true`.
+- **Manual:** open [Actions → Build, test, and deploy Next.js](https://github.com/yura888840/nextjs-playground/actions/workflows/server.yml), click **Run workflow**, select **main**, leave **Deploy to production (main branch only)** checked, and click **Run workflow** again. This does not require `VERCEL_DEPLOY_ENABLED`.
+- Uncheck the deployment option to run only the build and API checks. Manual runs on other branches also run checks only.
+
+The updated workflow must be merged into `main` before the new input appears. Manual deployment still requires all three Vercel secrets and any configured approval for the `production` environment.
 
 PR checks require no secrets. The deployment job uses Vercel's production build configuration and deploys the resulting prebuilt artifact. `vercel.json` disables native Git-triggered Vercel deployments to avoid bypassing the Actions checks.
 
@@ -70,7 +76,7 @@ Vercel Hobby is free within its limits for personal, non-commercial projects. AP
    - `VERCEL_TOKEN`: your Vercel access token.
    - `VERCEL_ORG_ID`: `orgId` from the generated `.vercel/project.json`.
    - `VERCEL_PROJECT_ID`: `projectId` from that file.
-4. Add the repository **variable** `VERCEL_DEPLOY_ENABLED` with value `true`.
+4. Optional: add the repository **variable** `VERCEL_DEPLOY_ENABLED` with value `true` to enable automatic deployment after pushes to `main`. Leave it unset or `false` for manual-only deployment.
 5. Merge this PR and inspect the Actions run, or run **Build, test, and deploy Next.js** manually on `main` if already merged.
 6. Open the production domain shown by Vercel and check `/api/health` twice to confirm fresh timestamps. Live hosting is not verified by the local test.
 
@@ -80,7 +86,7 @@ Keep tokens in GitHub Secrets; do not commit them. `.vercel/` is ignored. No sec
 
 The Pages workflow and static export configuration have been replaced because GitHub Pages cannot execute this API. The app now serves from `/`, without `/nextjs-playground`. Existing Pages content may remain online as an old snapshot, but receives no new deployments. Once Vercel is verified, unpublish the old Pages site in repository settings if desired.
 
-The deployment job stays disabled until setup is complete, so builds and API checks can run immediately. This PR alone does not create a Vercel account or publish a live server.
+Automatic deployment stays disabled unless explicitly enabled. Manual deployment checks the required secrets and fails with a clear error if any are missing. This repository configuration alone does not create a Vercel account or publish a live server.
 
 ## Files
 

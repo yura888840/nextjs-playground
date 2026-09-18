@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to production (main branch only)
+        type: boolean
+        required: true
+        default: true
 
 permissions:
   contents: read
@@ -35,7 +41,10 @@ jobs:
 
   deploy:
     needs: build-and-test
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.VERCEL_DEPLOY_ENABLED == 'true'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.deploy) ||
+       (github.event_name == 'push' && vars.VERCEL_DEPLOY_ENABLED == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
