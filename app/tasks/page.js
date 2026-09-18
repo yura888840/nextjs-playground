@@ -115,7 +115,7 @@ export default function TasksPage() {
         setTasks(data.tasks); setLoaded(true); setEdit(null); setDeleting(null); setMessage('Tasks refreshed.');
       })}>Refresh</button>
     </div>
-    <p className={styles.note}>Temporary demo: tasks may disappear after a restart or between hosted requests. Use disposable test data.</p>
+    <p className={styles.note}>Shared demo: tasks are saved on the server and visible to everyone. Use test data only.</p>
 
     <form className={styles.create} onSubmit={create} noValidate aria-label="Create task">
       <div className={styles.field}><label htmlFor="new-title">Task title</label>
