@@ -134,7 +134,7 @@ export default function TasksPage() {
   const disabled = loading || busy;
   return <main className={styles.main}>
     <Link href="/" className={styles.back}>← Playground</Link>
-    <p><Link href="/account">Account / Sign in</Link></p>
+    <p><Link href="/account">Account / Sign in</Link> · <Link href="/integrations">Import GitHub issue</Link></p>
     <div className={styles.heading}>
       <div><p className={styles.eyebrow}>NEXT.JS PLAYGROUND</p><h1>Tasks</h1></div>
       <button className={styles.secondary} disabled={disabled} onClick={() => perform(async () => {
