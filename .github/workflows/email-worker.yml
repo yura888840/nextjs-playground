@@ -1,0 +1,27 @@
+name: Process queued emails
+on:
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: email-worker
+  cancel-in-progress: false
+jobs:
+  process:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: production
+    env:
+      APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+      EMAIL_WORKER_SECRET: ${{ secrets.EMAIL_WORKER_SECRET }}
+    steps:
+      - name: Process one batch on the deployed application
+        shell: bash
+        run: |
+          if [[ ! "$APP_ORIGIN" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || [ "${#EMAIL_WORKER_SECRET}" -lt 32 ]; then
+            echo "::error::Configure APP_ORIGIN and EMAIL_WORKER_SECRET."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 65 \
+            --request POST --header "Authorization: Bearer $EMAIL_WORKER_SECRET" \
+            "$APP_ORIGIN/api/internal/email-jobs"
