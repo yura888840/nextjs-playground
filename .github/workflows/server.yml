@@ -59,6 +59,7 @@ jobs:
       - run: npm run test:auth
       - run: npm run test:permissions
       - run: npm run test:search
+      - run: npm run test:uploads
 
   deploy:
     needs: build-and-test

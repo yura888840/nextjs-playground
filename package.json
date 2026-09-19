@@ -14,7 +14,8 @@
     "test:auth": "node scripts/check-health.mjs --auth",
     "test:permissions": "node scripts/check-health.mjs --permissions",
     "user:role": "node scripts/set-role.mjs",
-    "test:search": "node scripts/check-health.mjs --search"
+    "test:search": "node scripts/check-health.mjs --search",
+    "test:uploads": "node scripts/check-health.mjs --uploads"
   },
   "keywords": [],
   "author": "",
