@@ -246,6 +246,26 @@ Run `npm run test:uploads` after building and migrating the isolated test databa
 
 References: [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Vercel Functions limits](https://vercel.com/docs/functions/limitations).
 
+## Ninth backend task: external API and GitHub webhooks
+
+Open `/integrations` (linked from Tasks) to import a **public GitHub issue**. `POST /api/integrations/github/import` accepts `{ "owner": "example", "repo": "project", "issueNumber": 42 }`. It requires your session and matching Origin. Import returns 201 with `taskId`, or 200 with the same ID on a repeated import. Each account gets its own task; pull requests are rejected. The title is trimmed to 200 UTF-16 units and closed issues become `done`.
+
+The server calls only `https://api.github.com`, without a token, with a five-second timeout, redirects disabled and a bounded response body. User-provided URLs are not accepted. Missing issues, provider throttling and invalid/upstream responses become structured errors. A persistent limit allows 20 import attempts per account per hour. GitHub's unauthenticated shared-IP limit also applies; this is a small-demo integration, not private repository access.
+
+Apply migration `005_github_integration.sql`. Import works without additional secrets. To enable inbound updates for a repository you administer:
+
+1. Generate a random secret of at least 32 characters, store it as server-only `GITHUB_WEBHOOK_SECRET`, and redeploy.
+2. In the GitHub repository's webhook settings, configure `https://YOUR_DOMAIN/api/webhooks/github`, content type `application/json`, the same secret and **Issues** events. Keep SSL verification enabled.
+3. Import an issue, then edit, close or reopen it. The signed event updates title and status on each previously imported copy. Local `in_progress` or edited titles will be replaced by the next newer issue snapshot.
+
+The endpoint validates HMAC-SHA256 over the original bounded body with a constant-time comparison before parsing it. It does not use a browser session or Origin header: the signature authenticates the sender. Only existing GitHub mappings can be updated; payloads cannot choose an arbitrary user or task. Database receipts deduplicate delivery UUIDs in the same transaction as changes. Reusing an ID with a changed body returns 409. Older or equal `updated_at` timestamps are ignored; events sharing a timestamp are not totally ordered. Repository renames are not followed automatically. Deleting a task removes its mapping and webhooks do not recreate it.
+
+When webhooks are disabled, the endpoint returns 503. Unsupported event types/actions return 202. Failed database transactions roll back receipts and changes together, permitting redelivery. Delivery receipts are retained; monitor their size before adding a cleanup policy because pruning weakens replay detection. Configure webhooks yourself only on repositories you administer; no repository settings are changed by this PR.
+
+`npm run test:integrations` uses a fake GitHub HTTP provider and real PostgreSQL, plus actual HTTP webhook requests. It covers timeout/error mapping, validation, repeat imports, ownership, throttling, bad signatures, replay and stale events. CI never calls the live GitHub API or sends messages.
+
+References: [GitHub issue API](https://docs.github.com/en/rest/issues/issues#get-an-issue), [GitHub webhook verification](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries).
+
 ## Verify the production server
 
 Tests require a **separate, initially empty** database, with a name ending in `_test`. They use `TEST_DATABASE_URL`, never the development `DATABASE_URL`. Create the local test database once:
