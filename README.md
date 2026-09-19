@@ -266,6 +266,42 @@ When webhooks are disabled, the endpoint returns 503. Unsupported event types/ac
 
 References: [GitHub issue API](https://docs.github.com/en/rest/issues/issues#get-an-issue), [GitHub webhook verification](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries).
 
+## Tenth backend task: background email jobs
+
+Open `/notifications` from Tasks and choose **Queue summary**. The request persists a snapshot of up to 100 of your own tasks and returns immediately with 202. A separate worker handles delivery. The recipient comes from your account; the API accepts no recipient, subject or body override. Preview and job status are visible only to the owner. One new summary per account per hour is allowed.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/api/notifications/task-summary` | `{ "requestId": "UUID" }`; persist job, 202 (200 for a repeat) |
+| GET | `/api/notifications/jobs` | Last 20 of your jobs |
+| GET | `/api/notifications/jobs/:id` | Your job status and captured message |
+| POST | `/api/internal/email-jobs` | Process at most 3 jobs; requires worker bearer secret |
+
+Apply `006_email_jobs.sql`. `EMAIL_MODE=preview` is the default: jobs become `previewed` without calling an email provider. Real delivery requires explicitly setting `EMAIL_MODE=send`, `RESEND_API_KEY` and `EMAIL_FROM` (a sender verified with Resend), then restarting/redeploying both app and worker. Mode and message, including sender, are captured when enqueuing; changing settings does not turn preview jobs into real emails or change retry payloads. This learning app does not yet verify account email ownership; keep preview mode for public/untrusted signups until email verification and broader abuse controls are implemented.
+
+### Run the worker
+
+For local development, in a separate terminal with the same `.env.local`:
+
+```sh
+npm run worker:email             # One batch, then exit
+npm run worker:email -- --watch  # Poll every five seconds until stopped
+```
+
+On Vercel, do not run a permanent background loop inside a request. Set a random 32+ character `EMAIL_WORKER_SECRET` on the app. The **Process queued emails** GitHub Actions workflow is manual-only: set repository variable `APP_ORIGIN` to the deployed HTTPS origin and repository secret `EMAIL_WORKER_SECRET` to the same value, merge the workflow into main, then select **Run workflow**. It invokes one bounded batch; it does not build or deploy the app. For unattended processing, run the CLI under a process supervisor or configure your scheduler to POST to the protected worker endpoint frequently (for example every minute). No automatic schedule is installed by this PR. Requests do not send email inline and no fire-and-forget promises are used.
+
+### Retry and crash behavior
+
+Workers claim one row at a time with `FOR UPDATE SKIP LOCKED`, allowing parallel workers without a shared in-memory queue. A claim has a two-minute lease and a random token. Expired leases can be reclaimed; stale workers cannot overwrite a newer claim. Provider requests time out after ten seconds. Network failures, 408/409/429 and server errors retry with exponential backoff and jitter, honoring bounded numeric Retry-After. Permanent provider errors or five attempts lead to `failed` status. Jobs older than 20 hours expire instead of retrying indefinitely; the scheduler must run often enough to process them.
+
+Each real request uses `task-summary/JOB_ID` as the Resend idempotency key with an immutable payload. This handles the crash window between provider acceptance and the database status update within the provider's retention window. It is not an unlimited exactly-once guarantee. `sent` means the provider accepted the message, not that it reached the inbox. A crash after the final accepted attempt may leave a failed/uncertain job; inspect provider delivery logs before requesting another message. Completed/failed payloads remain in PostgreSQL until the account is deleted or an operator applies a deliberate retention policy; deleting a job also removes its request deduplication record.
+
+CLI output and worker API responses contain aggregate counts only; errors stored on jobs are safe codes, not provider bodies, addresses, message content or credentials. Account deletion cascades queued jobs; a message already in flight cannot be recalled.
+
+`npm run test:email` exercises real PostgreSQL and HTTP endpoints, plus a separate worker process. It verifies deduplication, owner isolation, throttling, worker authorization, concurrent claims, expired-lease recovery, retries/exhaustion, message previews and stable provider keys. The provider is faked; CI and the development preview mode send no emails.
+
+References: [Resend send API](https://resend.com/docs/api-reference/emails/send-email), [Resend idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys).
+
 ## Verify the production server
 
 Tests require a **separate, initially empty** database, with a name ending in `_test`. They use `TEST_DATABASE_URL`, never the development `DATABASE_URL`. Create the local test database once:

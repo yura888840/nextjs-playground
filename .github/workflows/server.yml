@@ -61,6 +61,7 @@ jobs:
       - run: npm run test:search
       - run: npm run test:uploads
       - run: npm run test:integrations
+      - run: npm run test:email
 
   deploy:
     needs: build-and-test

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { testDatabaseUrl } from './test-database.mjs';
 
-if (['--tasks', '--auth', '--permissions', '--search', '--uploads', '--integrations'].some(flag => process.argv.includes(flag))) process.env.DATABASE_URL = testDatabaseUrl();
+if (['--tasks', '--auth', '--permissions', '--search', '--uploads', '--integrations', '--email'].some(flag => process.argv.includes(flag))) process.env.DATABASE_URL = testDatabaseUrl();
 if (process.argv.includes('--storage-unavailable')) process.env.DATABASE_URL = '';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -13,6 +13,7 @@ await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
 const testPort = reservation.address().port;
 await new Promise(resolve => reservation.close(resolve));
 if (process.argv.includes('--integrations')) process.env.GITHUB_WEBHOOK_SECRET = 'test-webhook-secret-only-for-local-ci-123456789';
+if (process.argv.includes('--email')) { process.env.EMAIL_MODE='preview'; process.env.EMAIL_WORKER_SECRET='test-email-worker-secret-only-ci-1234567890'; }
 const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(testPort)], {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', APP_ORIGIN: `http://127.0.0.1:${testPort}` },
@@ -59,6 +60,10 @@ try {
     assert.deepEqual(failure.error.fieldErrors, {});
     assert.deepEqual(failure.error.formErrors, []);
     console.log('Passed: unconfigured storage returns a structured 503.');
+  }
+  if (process.argv.includes('--email')) {
+    const { checkEmail } = await import('./check-email.mjs');
+    await checkEmail(origin);
   }
   if (process.argv.includes('--integrations')) {
     const { checkIntegrations } = await import('./check-integrations.mjs');
