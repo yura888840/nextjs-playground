@@ -13,7 +13,7 @@ export async function checkTasks(origin, cookie) {
     assert.match(response.headers.get('cache-control'), /no-store/);
     return response.json();
   };
-  assert.deepEqual(await read(await request()), { tasks: [] });
+  assert.deepEqual((await read(await request())).tasks, []);
 
   for (const body of [null, [], {}, { title: ' ' }, { title: 1 },
     { title: 'x'.repeat(201) }, { title: 'Test', status: 'invalid' }, { title: 'Test', id: 'client-id' }]) {
@@ -24,7 +24,7 @@ export async function checkTasks(origin, cookie) {
     assert.equal(typeof failure.fieldErrors, 'object');
   }
   await read(await request('', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{broken' }), 400);
-  assert.deepEqual(await read(await request()), { tasks: [] }, 'Invalid creates must not write');
+  assert.deepEqual((await read(await request())).tasks, [], 'Invalid creates must not write');
 
   const invalid = await read(await request('', write('POST', { title: ' ', status: 'bad' })), 422);
   assert.ok(invalid.error.fieldErrors.title.length);
@@ -82,7 +82,7 @@ export async function checkTasks(origin, cookie) {
   }
   assert.deepEqual((await read(await request())).tasks, [other]);
   assert.equal((await request(`/${other.id}`, { method: 'DELETE' })).status, 204);
-  assert.deepEqual(await read(await request()), { tasks: [] });
+  assert.deepEqual((await read(await request())).tasks, []);
   const unsupported = await request('', { method: 'PUT' });
   assert.equal(unsupported.headers.get('allow'), 'GET, HEAD, POST, OPTIONS');
   assert.equal((await read(unsupported, 405)).error.code, 'METHOD_NOT_ALLOWED');

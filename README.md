@@ -50,13 +50,13 @@ Tasks now persist in PostgreSQL (task 4) and are shared across application insta
 
 | Method | Endpoint | Success |
 | --- | --- | --- |
-| GET | `/api/tasks` | 200 with `{ "tasks": [...] }` |
+| GET | `/api/tasks` | 200 with `{ "tasks": [...], "pagination": {...} }` |
 | POST | `/api/tasks` | 201 with the new task and a `Location` header |
 | GET | `/api/tasks/:id` | 200 with one task |
 | PATCH | `/api/tasks/:id` | 200 with the updated task |
 | DELETE | `/api/tasks/:id` | 204 with an empty body |
 
-A task has `id` (server-generated UUID), `title`, `status`, `createdAt`, and `updatedAt` (UTC timestamps). Status is `todo` by default, with `in_progress` and `done` also supported. List order is creation time, then UUID; filtering and pagination are separate exercises.
+A task has `id` (server-generated UUID), `title`, `status`, `createdAt`, and `updatedAt` (UTC timestamps). Status is `todo` by default, with `in_progress` and `done` also supported. The list defaults to creation time, then UUID, with ten tasks per page. Search, filtering, sorting and pagination are described in task 7.
 
 POST requires a title; status is optional. PATCH accepts title, status, or both, and preserves omitted fields. Titles are trimmed and must contain 1–200 characters. Empty patches, unknown fields, invalid statuses, and non-object bodies return 422. Malformed JSON and malformed UUIDs return 400, non-JSON content types return 415, missing tasks return 404, and unsupported methods return 405. Errors use the structured format documented below. Server-owned IDs and timestamps cannot be overwritten. API responses use `Cache-Control: no-store`.
 
@@ -181,6 +181,40 @@ curl -b cookies.txt http://localhost:3000/api/tasks
 ```
 
 For POST/PATCH/DELETE add `-b cookies.txt` and `-H 'Origin: http://localhost:3000'` to the CRUD examples. Use `npm run dev` for HTTP testing; deployed production cookies require HTTPS. Keep cookie files private and out of version control.
+
+## Seventh backend task: search and pagination
+
+The task manager now has title search, a status filter, sorting, page-size selection and Previous/Next controls. Applying filters resets to page 1. Writes reload the current result set so renamed tasks, status changes, totals and empty last pages stay consistent with the active filters. A successful write followed by a failed refresh is reported separately, preventing accidental retries of an already-saved create.
+
+`GET /api/tasks` accepts these optional query parameters:
+
+| Parameter | Default | Rules |
+| --- | --- | --- |
+| `q` | empty | Trimmed, case-insensitive literal title substring; at most 200 characters |
+| `status` | all | `todo`, `in_progress` or `done`; omit for all |
+| `page` | 1 | Integer from 1 to 10000 |
+| `pageSize` | 10 | Integer from 1 to 100 |
+| `sort` | `oldest` | `oldest`, `newest` or `title` |
+
+Unknown or duplicate parameters and invalid values return 400 `INVALID_QUERY`. Search treats `%`, `_`, backslashes and SQL-like input as literal text. All values are SQL parameters; sort expressions come from a fixed allowlist. Each order includes UUID as a tie-breaker. Ownership is part of the query before filtering, counting and pagination, so neither rows nor totals reveal other accounts' tasks.
+
+Example: `/api/tasks?q=report&status=todo&page=2&pageSize=10&sort=newest`.
+
+```json
+{
+  "tasks": [],
+  "pagination": {
+    "page": 2, "pageSize": 10, "total": 0, "totalPages": 0,
+    "hasNext": false, "hasPrevious": true
+  }
+}
+```
+
+The count and page are read in one SQL statement. An out-of-range page returns an empty array and the actual total; the UI moves back to the last available page after deletion. The API now always returns pagination metadata and a bounded list. Clients that previously expected all tasks must request additional pages. Offset pagination is appropriate for this small learning project; large offsets cost more, and concurrent inserts/deletes between separate requests can shift page boundaries. Cursor pagination and indexed full-text search are possible later improvements.
+
+Run `npm run test:search` after building and migrating the test database. Tests cover multiple pages, tied timestamps, sorting, empty results, literal wildcard characters, invalid query strings and two-account isolation. No new migration or environment variable is required for this step.
+
+Reference: [PostgreSQL LIMIT and OFFSET](https://www.postgresql.org/docs/current/queries-limit.html).
 
 ## Verify the production server
 

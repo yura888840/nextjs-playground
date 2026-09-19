@@ -24,6 +24,29 @@ async function api(path = '', options = {}) {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState([]);
+  const [filters, setFilters] = useState({ q: '', status: '', sort: 'oldest', pageSize: '10' });
+  const [applied, setApplied] = useState({ q: '', status: '', sort: 'oldest', pageSize: '10' });
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 0 });
+
+  function listPath(values, page) {
+    const params = new URLSearchParams({ page: String(page), pageSize: values.pageSize, sort: values.sort });
+    if (values.q.trim()) params.set('q', values.q.trim());
+    if (values.status) params.set('status', values.status);
+    return `?${params}`;
+  }
+  async function reload(values = applied, page = pagination.page) {
+    let data = await api(listPath(values, page));
+    // A delete or filter change may remove the last row on the current page.
+    if (page > Math.max(1, data.pagination.totalPages)) {
+      data = await api(listPath(values, Math.max(1, data.pagination.totalPages)));
+    }
+    setTasks(data.tasks); setPagination(data.pagination); setApplied(values);
+    setLoaded(true); setEdit(null); setDeleting(null);
+  }
+  async function reloadAfterWrite() {
+    try { await reload(); }
+    catch { setLoaded(false); setTasks([]); setError('The change was saved, but the list could not refresh. Use Refresh before making another change.'); }
+  }
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -43,7 +66,7 @@ export default function TasksPage() {
     const timeout = setTimeout(() => controller.abort(), 15000);
     let active = true;
     api('', { signal: controller.signal })
-      .then(data => { if (active) { setTasks(data.tasks); setLoaded(true); } })
+      .then(data => { if (active) { setTasks(data.tasks); setPagination(data.pagination); setLoaded(true); } })
       .catch(() => { if (active) setError('Could not load tasks. Use Refresh to try again.'); })
       .finally(() => { clearTimeout(timeout); if (active) setLoading(false); });
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
@@ -76,11 +99,11 @@ export default function TasksPage() {
       return;
     }
     await perform(async () => {
-      const task = await api('', { method: 'POST', body: JSON.stringify(parsed.data) });
-      setTasks(current => [...current, task]);
+      await api('', { method: 'POST', body: JSON.stringify(parsed.data) });
       setTitle('');
       setStatus('todo');
-      setMessage('Task created.');
+      setMessage('Task created. Your filters and page are unchanged.');
+      await reloadAfterWrite();
     }, setCreateErrors);
     titleInput.current?.focus();
   }
@@ -97,12 +120,12 @@ export default function TasksPage() {
       return;
     }
     await perform(async () => {
-      const task = await api(`/${encodeURIComponent(edit.id)}`, {
+      await api(`/${encodeURIComponent(edit.id)}`, {
         method: 'PATCH', body: JSON.stringify(parsed.data),
       });
-      setTasks(current => current.map(item => item.id === task.id ? task : item));
       setEdit(null);
       setMessage('Task updated.');
+      await reloadAfterWrite();
     }, setEditErrors);
   }
 
@@ -113,11 +136,39 @@ export default function TasksPage() {
     <div className={styles.heading}>
       <div><p className={styles.eyebrow}>NEXT.JS PLAYGROUND</p><h1>Tasks</h1></div>
       <button className={styles.secondary} disabled={disabled} onClick={() => perform(async () => {
-        const data = await api();
-        setTasks(data.tasks); setLoaded(true); setEdit(null); setDeleting(null); setMessage('Tasks refreshed.');
+        await reload(); setMessage('Tasks refreshed.');
       })}>Refresh</button>
     </div>
     <p className={styles.note}>Only your account can access these tasks. Tasks are saved on the server.</p>
+
+    <form className={styles.filters} aria-label="Search tasks" onSubmit={event => {
+      event.preventDefault(); perform(() => reload(filters, 1));
+    }}>
+      <div className={styles.field}><label htmlFor="task-search">Search titles</label>
+        <input id="task-search" type="search" maxLength={200} value={filters.q} disabled={disabled} onChange={event => setFilters({ ...filters, q: event.target.value })} />
+      </div>
+      <div className={styles.field}><label htmlFor="filter-status">Filter status</label>
+        <select id="filter-status" value={filters.status} disabled={disabled} onChange={event => setFilters({ ...filters, status: event.target.value })}>
+          <option value="">All statuses</option>
+          {Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </div>
+      <div className={styles.field}><label htmlFor="task-sort">Sort</label>
+        <select id="task-sort" value={filters.sort} disabled={disabled} onChange={event => setFilters({ ...filters, sort: event.target.value })}>
+          <option value="oldest">Oldest first</option><option value="newest">Newest first</option><option value="title">Title</option>
+        </select>
+      </div>
+      <div className={styles.field}><label htmlFor="page-size">Tasks per page</label>
+        <select id="page-size" value={filters.pageSize} disabled={disabled} onChange={event => setFilters({ ...filters, pageSize: event.target.value })}>
+          {['10', '25', '50'].map(value => <option key={value}>{value}</option>)}
+        </select>
+      </div>
+      <button disabled={disabled}>Apply filters</button>
+      <button type="button" className={styles.secondary} disabled={disabled} onClick={() => {
+        const defaults = { q: '', status: '', sort: 'oldest', pageSize: '10' };
+        setFilters(defaults); perform(() => reload(defaults, 1));
+      }}>Reset</button>
+    </form>
 
     <form className={styles.create} onSubmit={create} noValidate aria-label="Create task">
       <div className={styles.field}><label htmlFor="new-title">Task title</label>
@@ -137,8 +188,13 @@ export default function TasksPage() {
     <p role="status" className={styles.message}>{loading ? 'Loading tasks…' : busy ? 'Working…' : message}</p>
 
     <section className={styles.list} aria-label="Task list" aria-busy={disabled}>
-      <h2>{loaded ? `Your tasks (${tasks.length})` : 'Your tasks'}</h2>
-      {loaded && tasks.length === 0 && <p className={styles.empty}>No tasks yet. Add your first task above.</p>}
+      <h2>{loaded ? `Matching tasks (${pagination.total})` : 'Your tasks'}</h2>
+      {loaded && tasks.length === 0 && <p className={styles.empty}>No matching tasks. Try different filters or add a task.</p>}
+      {loaded && <nav className={styles.pagination} aria-label="Task pages">
+        <button className={styles.secondary} disabled={disabled || !pagination.hasPrevious} onClick={() => perform(() => reload(applied, pagination.page - 1))}>Previous</button>
+        <span aria-live="polite">Page {pagination.page} of {Math.max(1, pagination.totalPages)}</span>
+        <button className={styles.secondary} disabled={disabled || !pagination.hasNext} onClick={() => perform(() => reload(applied, pagination.page + 1))}>Next</button>
+      </nav>}
       <ul>{tasks.map(task => <li key={task.id} className={styles.row}>
         {edit?.id === task.id ? <form onSubmit={save} noValidate className={styles.edit} aria-label="Edit task">
           <div className={styles.field}><label htmlFor="edit-title">Task title</label>
@@ -159,8 +215,8 @@ export default function TasksPage() {
             <span>Delete this task?</span>
             <button className={styles.danger} disabled={disabled} onClick={() => perform(async () => {
               await api(`/${encodeURIComponent(task.id)}`, { method: 'DELETE' });
-              setTasks(current => current.filter(item => item.id !== task.id));
               setDeleting(null); setMessage('Task deleted.');
+              await reloadAfterWrite();
             })}>Confirm delete</button>
             <button className={styles.secondary} disabled={disabled} onClick={() => setDeleting(null)}>Cancel</button>
           </div> : <div className={styles.actions}>

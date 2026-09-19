@@ -34,3 +34,7 @@
 
 .fieldError{color:#ffb4ac;font-size:14px;line-height:1.5;margin:0}
 .field [aria-invalid=true]{border-color:#ffb4ac}
+
+.filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; padding: 1rem 0; }
+.filters .field { flex: 1 1 150px; }
+.pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin: 1rem 0; }
