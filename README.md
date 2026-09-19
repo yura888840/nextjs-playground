@@ -216,6 +216,36 @@ Run `npm run test:search` after building and migrating the test database. Tests 
 
 Reference: [PostgreSQL LIMIT and OFFSET](https://www.postgresql.org/docs/current/queries-limit.html).
 
+## Eighth backend task: private task attachments
+
+Open **Attachments** on a task to upload, download or delete files. Only the task owner can access them; admin roles do not bypass ownership. Deleting a task or its account removes its attachments through foreign-key cascades.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| GET | `/api/tasks/:id/attachments` | Metadata list; file contents are not included |
+| POST | `/api/tasks/:id/attachments` | Multipart upload, exactly one `file` field; 201 and `Location` |
+| GET | `/api/tasks/:id/attachments/:attachmentId` | Download after checking the current session and task owner |
+| DELETE | `/api/tasks/:id/attachments/:attachmentId` | 204; requires a matching Origin |
+
+Supported extensions are `.txt`, `.pdf`, `.png`, `.jpg` and `.jpeg`. Files must be nonempty and no larger than **1 MiB**. Extension and MIME type must match; TXT content must be valid UTF-8 without binary control characters, and PDF/PNG/JPEG signatures are checked. Names are reduced to a basename, stripped of control characters and limited to 120 characters. Unknown multipart fields and multiple files are rejected. The complete multipart body is capped at 1 MiB + 16 KiB, counted while reading even when Content-Length is absent.
+
+Each task permits 10 files, and each account permits 20 MiB across tasks. Uploads lock the owner row within a transaction before checking quotas and inserting bytes, so concurrent uploads cannot bypass those limits. Failures return structured errors: 400 `INVALID_MULTIPART`, 413 `FILE_TOO_LARGE`, 415 `UNSUPPORTED_MEDIA_TYPE`, 422 `INVALID_FILE`, or 409 `ATTACHMENT_QUOTA`. Missing and foreign attachments both return 404. Normal session and origin errors still apply.
+
+Run `npm run db:migrate` to apply `004_task_attachments.sql` before deployment. This learning implementation stores both metadata and bounded file bytes in PostgreSQL `bytea`. It survives application restarts and works across hosted instances without a local filesystem or another storage credential. Database space and backup size therefore grow with uploads; for larger files or a public service, migrate the storage adapter to private object storage and consider direct signed uploads.
+
+Downloads are always served as `application/octet-stream` with `Content-Disposition: attachment`, `nosniff`, a restrictive CSP and `no-store`. There are no public file URLs or inline previews. Signature checks do not scan for malware or guarantee valid/safe PDF/image content; only download files you trust. Malware scanning is a separate future feature.
+
+With a local development session in `cookies.txt`:
+
+```sh
+curl -b cookies.txt -X POST http://localhost:3000/api/tasks/TASK_ID/attachments \
+  -H 'Origin: http://localhost:3000' -F 'file=@notes.txt;type=text/plain'
+```
+
+Run `npm run test:uploads` after building and migrating the isolated test database. It verifies type and size rejection, chunked-body limits, download headers and bytes, two-account access isolation, cross-origin rejection, persistence from another process, concurrent quota enforcement and cleanup after task deletion. Existing authentication, CRUD, search and permission suites also run in CI.
+
+References: [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), [Vercel Functions limits](https://vercel.com/docs/functions/limitations).
+
 ## Verify the production server
 
 Tests require a **separate, initially empty** database, with a name ending in `_test`. They use `TEST_DATABASE_URL`, never the development `DATABASE_URL`. Create the local test database once:

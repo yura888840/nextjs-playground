@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import TaskAttachments from './task-attachments.js';
 import { useEffect, useRef, useState } from 'react';
 import styles from './tasks.module.css';
 
@@ -58,6 +59,7 @@ export default function TasksPage() {
   const [status, setStatus] = useState('todo');
   const [edit, setEdit] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [attachmentsFor, setAttachmentsFor] = useState(null);
   const lock = useRef(false);
   const titleInput = useRef(null);
 
@@ -224,6 +226,10 @@ export default function TasksPage() {
             <button className={styles.secondary} disabled={disabled} aria-label={`Delete ${task.title}`} onClick={() => { setDeleting(task.id); setEdit(null); }}>Delete</button>
           </div>}
         </>}
+        <div className={styles.attachmentSection}>
+          <button className={styles.secondary} disabled={disabled} aria-expanded={attachmentsFor === task.id} onClick={() => setAttachmentsFor(attachmentsFor === task.id ? null : task.id)}>Attachments</button>
+          {attachmentsFor === task.id && <TaskAttachments taskId={task.id} disabled={disabled} />}
+        </div>
       </li>)}</ul>
     </section>
   </main>;

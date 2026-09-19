@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { testDatabaseUrl } from './test-database.mjs';
 
-if (['--tasks', '--auth', '--permissions', '--search'].some(flag => process.argv.includes(flag))) process.env.DATABASE_URL = testDatabaseUrl();
+if (['--tasks', '--auth', '--permissions', '--search', '--uploads'].some(flag => process.argv.includes(flag))) process.env.DATABASE_URL = testDatabaseUrl();
 if (process.argv.includes('--storage-unavailable')) process.env.DATABASE_URL = '';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -58,6 +58,10 @@ try {
     assert.deepEqual(failure.error.fieldErrors, {});
     assert.deepEqual(failure.error.formErrors, []);
     console.log('Passed: unconfigured storage returns a structured 503.');
+  }
+  if (process.argv.includes('--uploads')) {
+    const { checkUploads } = await import('./check-uploads.mjs');
+    await checkUploads(origin);
   }
   if (process.argv.includes('--search')) {
     const { checkSearch } = await import('./check-search.mjs');

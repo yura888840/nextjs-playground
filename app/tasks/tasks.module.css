@@ -38,3 +38,11 @@
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; padding: 1rem 0; }
 .filters .field { flex: 1 1 150px; }
 .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin: 1rem 0; }
+
+.row { flex-wrap: wrap; }
+.attachmentSection { flex: 1 1 100%; width: 100%; }
+.attachments { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #d9e1eb; }
+.attachments h4 { margin: 0 0 .5rem; }
+.attachments input[type=file] { max-width: 100%; }
+.attachmentRow { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; padding: .75rem 0; }
+.attachmentRow a { overflow-wrap: anywhere; }
